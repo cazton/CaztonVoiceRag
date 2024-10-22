@@ -1,0 +1,9 @@
+aiohttp==3.9.3
+azure-identity==1.18.0
+python-dotenv==1.0.0
+pymongo==4.7.0
+langchain-openai>=0.0.5
+scikit-learn==1.5.2
+PyPDF2==3.0.1
+langchain-community>=0.3.2
+pdfplumber
