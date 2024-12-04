@@ -14,14 +14,14 @@ from langchain_community.document_loaders import PDFPlumberLoader
 from langchain.text_splitter import CharacterTextSplitter
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # Search tool schema
 _search_tool_schema = {
     "type": "function",
     "name": "search",
-    "description": "Search the knowledge base. The knowledge base is in English, translate to and from English if " + \
-                   "needed. Results are formatted as a source name first in square brackets, followed by the text " + \
+    "description": "Search the knowledge base. The knowledge base is in English, translate to and from English if " +
+                   "needed. Results are formatted as a source name first in square brackets, followed by the text " +
                    "content, and a line with '-----' at the end of each result.",
     "parameters": {
         "type": "object",
@@ -39,8 +39,8 @@ _search_tool_schema = {
 _grounding_tool_schema = {
     "type": "function",
     "name": "report_grounding",
-    "description": "Report use of a source from the knowledge base as part of an answer (effectively, cite the source). Sources " + \
-                   "appear in square brackets before each knowledge base passage. Always use this tool to cite sources when responding " + \
+    "description": "Report use of a source from the knowledge base as part of an answer (effectively, cite the source). Sources " +
+                   "appear in square brackets before each knowledge base passage. Always use this tool to cite sources when responding " +
                    "with information from the knowledge base.",
     "parameters": {
         "type": "object",
@@ -57,9 +57,11 @@ _grounding_tool_schema = {
     }
 }
 
+
 def chunk_text(text, chunk_size=1000):
     # Split text into chunks of the given size
     return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+
 
 def extract_text_from_pdfs(pdf_dir, chunk_size=1000):
     documents = []
@@ -71,12 +73,12 @@ def extract_text_from_pdfs(pdf_dir, chunk_size=1000):
             text_splitter = CharacterTextSplitter(
                 chunk_size=chunk_size, chunk_overlap=100)
             loaded_documents = loader.load_and_split(text_splitter)
-            
+
             # Add metadata to each chunk
             for i, doc in enumerate(loaded_documents):
                 doc.metadata = {"title": f"{filename}_chunk_{i}"}
                 documents.append(doc)
-                
+
     return documents
 
 
@@ -85,10 +87,13 @@ def init_mongo_client(mongo_connection_string):
     return MongoClient(mongo_connection_string)
 
 # Vector search using CosmosDB Vector Store
+
+
 def vector_search(query, vector_store):
     # Perform similarity search on the query
     docs = vector_store.similarity_search(query)
     return docs
+
 
 def _search_tool(vector_store, args):
     query = args['query']
@@ -96,16 +101,18 @@ def _search_tool(vector_store, args):
 
     # Perform vector search using CosmosDB vector store
     results = vector_search(query, vector_store)
-    
+
     # Format results to be sent as a system message to the LLM
     result_str = ""
     for i, doc in enumerate(results):
-        truncated_content = doc.page_content[:2000] if len(doc.page_content) > 2000 else doc.page_content
+        truncated_content = doc.page_content[:2000] if len(
+            doc.page_content) > 2000 else doc.page_content
         result_str += f"[doc_{i}]: {doc.metadata['title']}\nContent: {truncated_content}\n-----\n"
     if not result_str or result_str.isspace():
         result_str = "1"
-    
+
     return ToolResult(result_str, ToolResultDirection.TO_SERVER)
+
 
 def _report_grounding_tool(vector_store, args):
     sources = args["sources"]
@@ -130,27 +137,51 @@ def _report_grounding_tool(vector_store, args):
     result_str = ""
     for result in search_results:
         result_str += f"[{result['chunk_id']}]: {result['content'][:200]}...\n-----\n"
-    
+
     if not result_str or result_str.isspace():
         result_str = "1"
 
     return ToolResult(result_str.strip(), ToolResultDirection.TO_SERVER)
 
+
 def check_index_exists(collection, index_name):
     indexes = collection.index_information()
     return index_name in indexes
 
+
 def check_vector_store_empty(vector_store):
     return vector_store._collection.count_documents({}) == 0
+
 
 def attach_rag_tools(rtmt, mongo_connection_string, database_name, collection_name, pdf_dir):
     mongo_client = init_mongo_client(mongo_connection_string)
 
+    # openai_embeddings = AzureOpenAIEmbeddings(
+    #     model=os.getenv("AZURE_OPENAI_EMBEDDINGS_MODEL_NAME"),
+    #     azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME"),
+    #     api_key=os.getenv("AZURE_OPENAI_API_KEY")
+    # )
+
     openai_embeddings = AzureOpenAIEmbeddings(
         model=os.getenv("AZURE_OPENAI_EMBEDDINGS_MODEL_NAME"),
         azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME"),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY")
+        azure_endpoint=os.getenv("EmbeddingsEndpoint"),
+        api_key=os.getenv("EmbeddingsKey"),
+        openai_api_version=os.getenv("EmbeddingsAPIVersion")
     )
+
+    print(
+        f'MODEL_NAME){os.getenv("AZURE_OPENAI_EMBEDDINGS_MODEL_NAME")}')
+    print(
+        f'DEPLOYMENT_NAME){os.getenv("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME")}')
+    print(
+        f'EMBEDDINGS_MODEL_NAME){os.getenv("AZURE_OPENAI_EMBEDDINGS_MODEL_NAME")}')
+    print(
+        f'EmbeddingsEndpoint){os.getenv("EmbeddingsEndpoint")}')
+    print(
+        f'EmbeddingsKey){os.getenv("EmbeddingsKey")}')
+    print(
+        f'EmbeddingsAPIVersion){os.getenv("EmbeddingsAPIVersion")}')
 
     collection = mongo_client[database_name][collection_name]
     index_name = "ContosoIndex"
@@ -162,10 +193,10 @@ def attach_rag_tools(rtmt, mongo_connection_string, database_name, collection_na
     num_lists = 100
     dimensions = 1536  # Size of the embeddings
     similarity_algorithm = CosmosDBSimilarityType.COS
-    kind = CosmosDBVectorSearchType.VECTOR_HNSW
-    m = 16
-    ef_construction = 64
-    
+    kind = CosmosDBVectorSearchType.VECTOR_IVF
+    # m = 16
+    # ef_construction = 64
+
     # If the index doesn't exist or the vector store is empty, create and index the vector store
     if create_new_index:
         print("Creating vector store and indexing documents...")
@@ -181,7 +212,7 @@ def attach_rag_tools(rtmt, mongo_connection_string, database_name, collection_na
         )
 
         vector_store.create_index(
-            num_lists, dimensions, similarity_algorithm, kind, m, ef_construction
+            num_lists, dimensions, similarity_algorithm, kind
         )
     else:
         print("Vector store already exists, reusing it for querying.")
@@ -206,7 +237,7 @@ def attach_rag_tools(rtmt, mongo_connection_string, database_name, collection_na
 
             # Recreate the index if necessary
             vector_store.create_index(
-                num_lists, dimensions, similarity_algorithm, kind, m, ef_construction
+                num_lists, dimensions, similarity_algorithm, kind
             )
 
     # Attach search and grounding tools

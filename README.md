@@ -77,11 +77,13 @@ You can run the project locally using the [Dev Containers extension](https://mar
 3. Start the application:
     Windows:
     ```
-    pwsh .\scripts\start.ps1
+    cd app
+    pwsh .\start.ps1
     ```
     Linux/Mac:
     ```
-    ./scripts/start.sh
+    cd app
+    /start.sh
     ```
 
 4. Access the app at [http://localhost:8765](http://localhost:8765).
