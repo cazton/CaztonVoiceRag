@@ -156,12 +156,6 @@ def check_vector_store_empty(vector_store):
 def attach_rag_tools(rtmt, mongo_connection_string, database_name, collection_name, pdf_dir):
     mongo_client = init_mongo_client(mongo_connection_string)
 
-    # openai_embeddings = AzureOpenAIEmbeddings(
-    #     model=os.getenv("AZURE_OPENAI_EMBEDDINGS_MODEL_NAME"),
-    #     azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME"),
-    #     api_key=os.getenv("AZURE_OPENAI_API_KEY")
-    # )
-
     openai_embeddings = AzureOpenAIEmbeddings(
         model=os.getenv("AZURE_OPENAI_EMBEDDINGS_MODEL_NAME"),
         azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME"),
